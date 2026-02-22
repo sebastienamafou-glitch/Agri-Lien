@@ -22,7 +22,7 @@ async function validateUserAction(formData: FormData) {
 export default async function AdminUsersPage() {
   // Récupération des utilisateurs en attente
   const pendingUsers = await prisma.user.findMany({
-    where: { role: "PENDING" },
+    where: { role: "PENDING" as UserRole },
   });
 
   return (
