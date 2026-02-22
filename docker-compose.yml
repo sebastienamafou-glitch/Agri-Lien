@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # Base de données avec extension PostGIS pré-installée
+  # Nécessaire pour le module "Traçabilité Cacao" (Polygones GPS) [cite: 40, 176]
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: agri-lien-db
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-agri_lien_secure_pass}
+      POSTGRES_DB: ${DB_NAME:-agrilien_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-admin} -d ${DB_NAME:-agrilien_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Interface graphique pour gérer la BDD (Optionnel mais recommandé)
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: agri-lien-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@webappci.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:

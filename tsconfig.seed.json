@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "noEmit": true,
+    "esModuleInterop": true
+  },
+  "include": [
+    "src/infrastructure/database/prisma/seed.ts",
+    "src/infrastructure/security/encryption.ts"
+  ]
+}

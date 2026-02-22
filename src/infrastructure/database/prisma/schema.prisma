@@ -1,0 +1,308 @@
+generator client {
+  provider = "prisma-client-js"
+  // INDISPENSABLE : Permet à Prisma de gérer l'extension PostGIS
+  previewFeatures = ["postgresqlExtensions"] 
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis] // Active l'extension sur Neon/Postgres
+}
+
+////////////////////////////
+/// ENUMS (MULTI-FILIÈRES)
+////////////////////////////
+
+enum UserRole {
+  PRODUCER
+  COOPERATIVE
+  TRANSPORTER
+  BANK
+  ADMIN
+}
+
+enum HarvestStatus {
+  DECLARED
+  VALIDATED
+  REJECTED
+}
+
+// ✅ NOUVEAU : Gestion de toutes les filières de la GIZ
+enum CropType {
+  CACAO
+  HEVEA
+  ANACARDE
+  RIZ
+  MANIOC
+}
+
+// ✅ NOUVEAU : Unités de mesure dynamiques (Liquide/Solide)
+enum MeasurementUnit {
+  KG
+  TONNE
+  LITRE
+  SAC
+}
+
+// Remplacement de BagStatus par BatchStatus (Plus générique)
+enum BatchStatus {
+  CREATED
+  SCANNED
+  IN_TRANSIT
+  DELIVERED
+  BLOCKED
+}
+
+enum TransportStatus {
+  PENDING
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TransactionStatus {
+  INITIATED
+  SUCCESS
+  FAILED
+}
+
+////////////////////////////
+/// CORE USER SYSTEM
+////////////////////////////
+
+model User {
+  id              String   @id @default(uuid())
+  phoneNumber     String   @unique
+  role            UserRole
+  firstName       String
+  lastName        String
+  nationalIdHash  String   // AES-256 encrypted
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+  
+  producerProfile     ProducerProfile?
+  transporterProfile  TransporterProfile?
+  cooperativeProfile  CooperativeProfile?
+  bankProfile         BankProfile?
+
+  transactions    Transaction[]
+  auditLogs       AuditLog[]
+}
+
+model CooperativeProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+  name        String
+  region      String
+  createdAt   DateTime @default(now())
+}
+
+////////////////////////////
+/// PRODUCER DOMAIN
+////////////////////////////
+
+model ProducerProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id])
+
+  farmPlots   FarmPlot[]
+  harvests    Harvest[]
+  score       AgriculturalScore?
+
+  createdAt   DateTime @default(now())
+  transportOrders TransportOrder[]
+}
+
+model FarmPlot {
+  id              String   @id @default(uuid())
+  producerId      String
+  producer        ProducerProfile @relation(fields: [producerId], references: [id])
+
+  name            String
+  cropType        CropType @default(CACAO) // ✅ La parcelle sait ce qu'elle cultive
+  areaHectares    Float
+  estimatedYield  Float?   @default(0) // Estimation de production pour cette parcelle
+  
+  // Type PostGIS pour les polygones (Prêt pour la norme EUDR)
+  location        Unsupported("geometry(Polygon, 4326)")?
+
+  createdAt       DateTime @default(now())
+
+  harvests        Harvest[]
+
+  @@index([producerId])
+}
+
+model Harvest {
+  id            String   @id @default(uuid())
+  producerId    String
+  producer      ProducerProfile @relation(fields: [producerId], references: [id])
+
+  farmPlotId    String
+  farmPlot      FarmPlot @relation(fields: [farmPlotId], references: [id])
+
+  cropType      CropType @default(CACAO) // ✅ Hérité de la parcelle
+  quantity      Float    // ✅ Remplacement de quantityKg
+  unit          MeasurementUnit @default(KG) // ✅ Litres, Kg, Tonnes...
+  status        HarvestStatus
+  
+  declaredAt    DateTime @default(now())
+
+  batches       ProductBatch[] // ✅ Remplacement des batches par des "Lots" génériques
+
+  @@index([producerId])
+  @@index([farmPlotId])
+}
+
+////////////////////////////
+/// TRACEABILITY (AGNOSTIC)
+////////////////////////////
+
+// ✅ Remplacement de CocoaBag par ProductBatch (Lot de produit)
+model ProductBatch {
+  id            String   @id @default(uuid())
+  qrCode        String   @unique
+  harvestId     String
+  harvest       Harvest  @relation(fields: [harvestId], references: [id])
+
+  quantity      Float    // ✅ Remplacement de weightKg
+  unit          MeasurementUnit @default(KG)
+  status        BatchStatus
+  scannedAt     DateTime?
+  deliveredAt   DateTime?
+
+  events        BatchEvent[]
+
+  @@index([harvestId])
+}
+
+// ✅ Remplacement de BagEvent par BatchEvent
+model BatchEvent {
+  id          String   @id @default(uuid())
+  batchId     String
+  batch       ProductBatch @relation(fields: [batchId], references: [id])
+
+  eventType   String
+  // Type PostGIS pour les points de scan GPS
+  location    Unsupported("geometry(Point, 4326)")
+  timestamp   DateTime @default(now())
+}
+
+////////////////////////////
+/// MOBILE MONEY
+////////////////////////////
+
+model Transaction {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+
+  amount          Float
+  provider        String   // ORANGE / MTN
+  externalRef     String?
+  status          TransactionStatus
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+}
+
+////////////////////////////
+/// AGRICULTURAL SCORE
+////////////////////////////
+
+model AgriculturalScore {
+  id            String   @id @default(uuid())
+  producerId    String   @unique
+  producer      ProducerProfile @relation(fields: [producerId], references: [id])
+
+  productionVolume   Float
+  deliveryRegularity Float
+  creditHistory      Float
+  calculatedScore    Float
+  updatedAt          DateTime @updatedAt
+}
+
+////////////////////////////
+/// TRANSPORT SYSTEM
+////////////////////////////
+
+model TransporterProfile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+
+  vehicleType     String
+  capacity        Float    // ✅ Remplacement de capacityKg
+  unit            MeasurementUnit @default(TONNE)
+
+  currentLocation Unsupported("geometry(Point, 4326)")?
+
+  transportOrders TransportOrder[]
+}
+
+model TransportOrder {
+  id              String   @id @default(uuid())
+  producerId      String
+  producer        ProducerProfile @relation(fields: [producerId], references: [id])
+
+  transporterId   String?
+  transporter     TransporterProfile? @relation(fields: [transporterId], references: [id])
+
+  // Points GPS départ/arrivée
+  pickupLocation  Unsupported("geometry(Point, 4326)")
+  dropoffLocation Unsupported("geometry(Point, 4326)")
+
+  status          TransportStatus
+  requestedAt     DateTime @default(now())
+  completedAt     DateTime?
+
+  @@index([producerId])
+  @@index([transporterId])
+}
+
+////////////////////////////
+/// BANK
+////////////////////////////
+
+model BankProfile {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+
+  approvedCredits Float
+}
+
+////////////////////////////
+/// AUDIT & SECURITY
+////////////////////////////
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  action          String
+  entityType      String
+  entityId        String
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+}
+
+////////////////////////////
+/// SYSTEM SETTINGS & PRICING
+////////////////////////////
+
+model CropPrice {
+  id           String          @id @default(uuid())
+  cropType     CropType        @unique // Un seul prix actif par filière
+  pricePerUnit Float           // Le prix officiel fixé par l'État (ex: 2800)
+  unit         MeasurementUnit @default(KG)
+  updatedAt    DateTime        @updatedAt // Permet de savoir quand le prix a changé
+}
