@@ -52,17 +52,10 @@ export default function ProducerMap({ plots }: ProducerMapProps) {
         style={{ height: "100%", width: "100%" }}
         scrollWheelZoom={false} // Pour ne pas gêner le scroll de la page
       >
-        {/* Fond de carte Satellite (Esri World Imagery) pour bien voir les champs */}
+        {/* ✅ SOLUTION : Carte standard OpenStreetMap, 100% gratuite et sans clé API */}
         <TileLayer
-          attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-          url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-        />
-
-        {/* Optionnel : Une couche "Routes/Noms" par dessus pour se repérer */}
-        <TileLayer
-          attribution='&copy; <a href="https://stadiamaps.com/">Stadia Maps</a>'
-          url="https://tiles.stadiamaps.com/tiles/stamen_toner_lines/{z}/{x}/{y}{r}.png"
-          opacity={0.5} // Transparence pour voir la forêt dessous
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
         {/* Ici, nous dessinerons les polygones plus tard. 
