@@ -5,18 +5,43 @@ import Link from "next/link";
 import { Truck, MapPin, Navigation, Package, QrCode, UserIcon, ArrowRight } from "lucide-react";
 import LogoutButton from "@/components/dashboard/LogoutButton";
 import { acceptOrder } from "@/app/actions/logistics/logistics";
+import { redirect } from "next/navigation";
 
 export default async function TransporterDashboard() {
-  // 1. Récupération du VRAI chauffeur connecté
   const session = await getServerSession(authOptions);
-  const user = await prisma.user.findUnique({
-    where: { phoneNumber: session?.user?.email || "" },
+  if (!session?.user?.email) redirect("/auth/login");
+
+  // 1. Récupération du VRAI chauffeur connecté
+  let user = await prisma.user.findUnique({
+    where: { phoneNumber: session.user.email },
     include: { transporterProfile: true }
   });
 
+  if (!user) redirect("/auth/login");
+
+  // 🛠️ LA CORRECTION EST ICI : AUTO-CRÉATION DU PROFIL
+  // Si l'admin lui a donné le rôle mais qu'il n'a pas encore de profil transporteur
+  if (!user.transporterProfile) {
+    await prisma.transporter.create({
+      data: {
+        userId: user.id,
+        vehicleType: "Camion Standard",
+        capacity: 5,
+        unit: "TONNES",
+      }
+    });
+    // On recharge l'utilisateur pour avoir son nouvel ID de transporteur
+    user = await prisma.user.findUnique({
+      where: { phoneNumber: session.user.email },
+      include: { transporterProfile: true }
+    });
+  }
+
+  // Maintenant, on est sûr à 100% d'avoir un ID valide
   const transporterId = user?.transporterProfile?.id;
 
   // 2. Ses missions assignées (En cours ou à récupérer)
+  // Comme transporterId n'est plus jamais vide, il ne verra QUE les siennes !
   const activeMissions = await prisma.transportOrder.findMany({
     where: {
       transporterId: transporterId,
@@ -46,7 +71,7 @@ export default async function TransporterDashboard() {
               Salut, {user?.firstName} <Truck className="w-6 h-6 text-[#FF8200]" />
             </h1>
             <p className="text-slate-400 text-sm font-medium mt-1">
-              {user?.transporterProfile?.vehicleType || "Camion"} • Capacité: {user?.transporterProfile?.capacity || "---"} {user?.transporterProfile?.unit?.toLowerCase() || ""}
+              {user?.transporterProfile?.vehicleType} • Capacité: {user?.transporterProfile?.capacity} {user?.transporterProfile?.unit?.toLowerCase()}
             </p>
           </div>
           <LogoutButton />
@@ -139,7 +164,6 @@ export default async function TransporterDashboard() {
                     </div>
                   </div>
 
-                  {/* ✅ LA CORRECTION : On passe les 2 bons arguments ! */}
                   <form action={async (formData) => {
                     "use server";
                     const orderId = formData.get("orderId") as string;
@@ -178,4 +202,4 @@ export default async function TransporterDashboard() {
       </nav>
     </div>
   );
-}
+}s

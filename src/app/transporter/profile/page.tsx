@@ -7,23 +7,32 @@ import LogoutButton from "@/components/dashboard/LogoutButton";
 import { Truck, QrCode, User, ShieldCheck, MapPin, CheckCircle2 } from "lucide-react";
 
 export default async function TransporterProfilePage() {
+  // 1. SÉCURITÉ : Vérification via le "badge" (numéro de téléphone stocké dans email)
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) redirect("/auth/login");
+  if (!session?.user?.email) redirect("/auth/login");
 
-  // Récupérer le profil transporteur
-  const transporterProfile = await prisma.transporterProfile.findUnique({
-    where: { userId: session.user.id },
+  // 2. RÉCUPÉRATION BLINDÉE : On passe par le compte Utilisateur
+  const user = await prisma.user.findUnique({
+    where: { phoneNumber: session.user.email },
     include: {
-      user: true,
-      transportOrders: {
-        where: { status: 'COMPLETED' }
+      transporterProfile: {
+        include: {
+          transportOrders: {
+            where: { status: 'COMPLETED' }
+          }
+        }
       }
     }
   });
 
-  if (!transporterProfile) return redirect("/auth/login");
+  // 3. LOGIQUE : S'il n'a pas encore de profil de camion, on le renvoie au Dashboard 
+  // car c'est là-bas que se trouve notre script "d'auto-création" magique.
+  if (!user || !user.transporterProfile) {
+    return redirect("/transporter/dashboard");
+  }
 
-  const completedMissions = transporterProfile.transportOrders.length;
+  const transporterProfile = user.transporterProfile;
+  const completedMissions = transporterProfile.transportOrders?.length || 0;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans pb-20">
@@ -41,12 +50,12 @@ export default async function TransporterProfilePage() {
         
         <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100 text-center">
           <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm text-3xl font-black uppercase">
-            {transporterProfile.user.firstName[0]}{transporterProfile.user.lastName[0]}
+            {user.firstName[0]}{user.lastName[0]}
           </div>
           <h2 className="text-xl font-black text-slate-900">
-            {transporterProfile.user.firstName} {transporterProfile.user.lastName}
+            {user.firstName} {user.lastName}
           </h2>
-          <p className="text-slate-500 font-medium text-sm mt-1">{transporterProfile.user.phoneNumber}</p>
+          <p className="text-slate-500 font-medium text-sm mt-1">{user.phoneNumber}</p>
           
           <div className="flex justify-center mt-4">
             <span className="bg-green-50 text-[#009A44] px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 border border-green-100">
@@ -70,7 +79,6 @@ export default async function TransporterProfilePage() {
             </div>
             <div className="pl-4">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Capacité Max</p>
-              {/* ✅ CORRECTION : Utilisation de la nouvelle nomenclature GIZ */}
               <p className="font-black text-slate-900 text-sm">
                 {transporterProfile.capacity} {transporterProfile.unit || "UNITÉS"}
               </p>

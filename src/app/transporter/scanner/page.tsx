@@ -7,18 +7,32 @@ import Link from "next/link";
 import { Truck, QrCode, User, PackageX } from "lucide-react";
 
 export default async function TransporterScannerPage() {
+  // 1. SÉCURITÉ : On vérifie la session
   const session = await getServerSession(authOptions);
-  if (!session) redirect("/auth/login");
+  if (!session?.user?.email) redirect("/auth/login");
 
-  // On cherche si le chauffeur a une mission en cours
+  // 2. SÉCURITÉ : On récupère le vrai profil transporteur de manière blindée
+  const user = await prisma.user.findUnique({
+    where: { phoneNumber: session.user.email },
+    include: { transporterProfile: true }
+  });
+
+  if (!user || !user.transporterProfile) {
+    redirect("/transporter/dashboard");
+  }
+
+  const transporterId = user.transporterProfile.id;
+
+  // 3. LOGIQUE MÉTIER : On cherche sa mission en cours (Uniquement celles acceptées)
   const activeOrder = await prisma.transportOrder.findFirst({
     where: {
-      transporter: { userId: session.user.id },
-      status: { in: ['PENDING', 'ACCEPTED', 'IN_PROGRESS'] } // Statuts valides pour un enlèvement
+      transporterId: transporterId, // ✅ Le filtre absolu
+      status: { in: ['ACCEPTED', 'IN_PROGRESS'] } // ❌ PENDING retiré : il faut accepter la course d'abord !
     },
     include: {
       producer: { include: { user: true } }
-    }
+    },
+    orderBy: { updatedAt: "desc" } // S'il en a plusieurs, on prend la plus récente
   });
 
   return (
@@ -42,7 +56,7 @@ export default async function TransporterScannerPage() {
       <main className="flex-1 relative flex flex-col">
         {activeOrder ? (
           <div className="flex-1 relative rounded-t-3xl overflow-hidden bg-black">
-            {/* Composant Caméra (Déjà créé précédemment) */}
+            {/* Composant Caméra */}
             <QRScanner orderId={activeOrder.id} />
             
             {/* Masque de visée (Design par-dessus la caméra) */}

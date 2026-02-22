@@ -1,10 +1,41 @@
 import QRScanner from "@/components/logistics/QRScanner";
 import Link from "next/link";
 import { X, Camera, ScanLine, QrCode } from "lucide-react";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/infrastructure/auth/auth.config";
+import { redirect, notFound } from "next/navigation";
+import prisma from "@/lib/prisma";
 
 export default async function TransporterScanPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = await params;
   const id = resolvedParams.id;
+
+  // 1. SÉCURITÉ : Vérification de la session
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) redirect("/auth/login");
+
+  // 2. SÉCURITÉ : Récupération du profil Transporteur
+  const user = await prisma.user.findUnique({
+    where: { phoneNumber: session.user.email },
+    include: { transporterProfile: true }
+  });
+
+  if (!user || !user.transporterProfile) {
+    redirect("/transporter/dashboard");
+  }
+
+  const transporterId = user.transporterProfile.id;
+
+  // 3. LE CADENAS : On vérifie que la mission lui appartient bien
+  const order = await prisma.transportOrder.findFirst({
+    where: { 
+      id: id,
+      transporterId: transporterId 
+    },
+  });
+
+  // Si la mission n'est pas à lui ou n'existe pas, on bloque !
+  if (!order) notFound();
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-white font-sans flex flex-col">

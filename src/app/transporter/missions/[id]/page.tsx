@@ -1,5 +1,7 @@
 import prisma from "@/lib/prisma";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/infrastructure/auth/auth.config";
 import Link from "next/link";
 import { updateOrderStatus } from "@/app/actions/logistics/logistics";
 import { 
@@ -17,17 +19,37 @@ export default async function MissionDetailPage({ params }: { params: Promise<{ 
   const resolvedParams = await params;
   const id = resolvedParams.id;
 
-  // 1. Récupération de la commande
-  const order = await prisma.transportOrder.findUnique({
-    where: { id },
+  // 1. SÉCURITÉ : Vérification du badge (Session)
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) redirect("/auth/login");
+
+  // 2. Récupération du profil Transporteur
+  const user = await prisma.user.findUnique({
+    where: { phoneNumber: session.user.email },
+    include: { transporterProfile: true }
+  });
+
+  if (!user || !user.transporterProfile) {
+    redirect("/transporter/dashboard");
+  }
+
+  const transporterId = user.transporterProfile.id;
+
+  // 3. LE CADENAS : On exige que la mission existe ET qu'elle appartienne à ce transporteur
+  const order = await prisma.transportOrder.findFirst({
+    where: { 
+      id: id,
+      transporterId: transporterId // ✅ C'est ce filtre qui rend le piratage impossible
+    },
     include: {
       producer: { include: { user: true } },
     },
   });
 
+  // Si on ne trouve rien (ou si c'est la mission d'un autre), on affiche une page 404
   if (!order) notFound();
 
-  // 2. Extraction des coordonnées GPS (PostGIS)
+  // 4. Extraction des coordonnées GPS (PostGIS)
   const coords: any[] = await prisma.$queryRaw`
     SELECT 
       ST_Y("pickupLocation"::geometry) as pickup_lat, 
