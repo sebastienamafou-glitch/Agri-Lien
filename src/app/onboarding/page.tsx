@@ -6,35 +6,46 @@ import prisma from "@/lib/prisma";
 export default async function OnboardingSplashPage() {
   const session = await getServerSession(authOptions);
 
-  // 1. Si pas connecté -> Retour à l'accueil
-  if (!session?.user?.email) {
+  // 1. Vérification plus large de la session
+  // On regarde si l'utilisateur existe, peu importe si c'est via email ou un ID
+  if (!session?.user) {
     redirect("/auth/login");
   }
 
-  // 2. Détermination du rôle via la base de données
+  // 2. Récupération via le numéro de téléphone (votre identifiant unique)
+  // On utilise l'email de la session s'il contient le numéro, ou on peut tester d'autres champs
+  const identifier = session.user.email || (session.user as any).phone;
+
+  if (!identifier) {
+    console.error("❌ Aucun identifiant trouvé dans la session");
+    redirect("/auth/login?error=SessionIncomplete");
+  }
+
   const user = await prisma.user.findUnique({
-    where: { phoneNumber: session.user.email },
+    where: { phoneNumber: identifier },
     select: { role: true }
   });
 
-  // 3. Si l'utilisateur n'existe pas en base -> Login avec erreur
+  // 3. Si l'utilisateur n'existe pas encore en base
   if (!user) {
     redirect("/auth/login?error=UserNotFound");
   }
 
-  // 4. L'AIGUILLAGE STRICT (1 Rôle = 1 Espace)
-  if (user.role === "ADMIN") {
-    redirect("/admin/dashboard");
-  } else if (user.role === "COOPERATIVE") {
-    // ✅ LA CORRECTION EST ICI : La coopérative va dans SON module
-    redirect("/cooperative/dashboard"); 
-  } else if (user.role === "PRODUCER") {
-    redirect("/producer/dashboard");
-  } else if (user.role === "TRANSPORTER") {
-    redirect("/transporter/dashboard");
-  } else if (user.role === "BANK") {
-    redirect("/bank/dashboard");
-  } else {
-    redirect("/auth/login?error=RoleNotDefined");
+  // 4. L'AIGUILLAGE (Best Practice : Switch case)
+  console.log(`🚀 Redirection de l'utilisateur avec le rôle : ${user.role}`);
+
+  switch (user.role) {
+    case "ADMIN":
+      redirect("/admin/dashboard");
+    case "COOPERATIVE":
+      redirect("/cooperative/dashboard");
+    case "PRODUCER":
+      redirect("/producer/dashboard");
+    case "TRANSPORTER":
+      redirect("/transporter/dashboard");
+    case "BANK":
+      redirect("/bank/dashboard");
+    default:
+      redirect("/auth/login?error=RoleNotDefined");
   }
 }
