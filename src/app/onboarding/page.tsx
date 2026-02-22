@@ -34,7 +34,7 @@ export default async function OnboardingSplashPage() {
   // 4. L'AIGUILLAGE (Best Practice : Switch case)
   console.log(`🚀 Redirection de l'utilisateur avec le rôle : ${user.role}`);
 
-  switch (user.role) {
+  switch (user.role as string) {
     case "ADMIN":
       redirect("/admin/dashboard");
     case "COOPERATIVE":
