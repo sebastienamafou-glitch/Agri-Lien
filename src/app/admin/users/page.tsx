@@ -1,82 +1,119 @@
 import prisma from "@/lib/prisma";
-import { Users, Phone, Calendar, ShieldCheck } from "lucide-react";
+import { revalidatePath } from "next/cache";
+import { UserRole } from "@prisma/client";
+import { ShieldAlert, CheckCircle, UserPlus, Clock } from "lucide-react";
 
-export const dynamic = "force-dynamic";
+// ✅ ACTION SERVEUR : Modifie le rôle dans la base de données
+async function validateUserAction(formData: FormData) {
+  "use server";
+  const userId = formData.get("userId") as string;
+  const newRole = formData.get("role") as UserRole;
+
+  if (userId && newRole) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role: newRole },
+    });
+    // Rafraîchit la page instantanément après la mise à jour
+    revalidatePath("/admin/users");
+  }
+}
 
 export default async function AdminUsersPage() {
-  const users = await prisma.user.findMany({
-    orderBy: { createdAt: 'desc' },
+  // Récupération des utilisateurs en attente
+  const pendingUsers = await prisma.user.findMany({
+    where: { role: "PENDING" },
   });
 
-  // Fonction utilitaire pour les couleurs des rôles
-  const getRoleBadge = (role: string) => {
-    switch(role) {
-      case 'ADMIN': return 'bg-red-50 text-red-600 border-red-100';
-      case 'COOPERATIVE': return 'bg-purple-50 text-purple-600 border-purple-100';
-      case 'PRODUCER': return 'bg-green-50 text-[#009A44] border-green-100';
-      case 'TRANSPORTER': return 'bg-orange-50 text-[#FF8200] border-orange-100';
-      case 'BANK': return 'bg-blue-50 text-blue-600 border-blue-100';
-      default: return 'bg-slate-50 text-slate-600 border-slate-100';
-    }
-  };
-
   return (
-    <div className="p-6 md:p-10 space-y-8 animate-in fade-in duration-500">
+    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8">
       
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      {/* En-tête de la page */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            <Users className="w-8 h-8 text-blue-500" /> Utilisateurs
-          </h1>
-          <p className="text-slate-500 font-medium mt-1">
-            Annuaire centralisé de tous les acteurs du réseau Agri-Lien CI.
-          </p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Gestion des Accès</h1>
+          <p className="text-slate-500 mt-1">Validez et attribuez les rôles aux nouveaux inscrits.</p>
         </div>
-        <div className="bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2">
-          Total: {users.length}
-        </div>
+        
+        {/* Bouton pour créer manuellement (Future étape) */}
+        <button className="flex items-center gap-2 bg-[#009A44] hover:bg-green-700 text-white px-5 py-2.5 rounded-lg font-bold transition-colors shadow-sm">
+          <UserPlus className="w-5 h-5" />
+          <span>Créer un acteur certifié</span>
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {users.map((u) => (
-          <div key={u.id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-            
-            <div className="flex justify-between items-start mb-4">
-              <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-lg uppercase border ${getRoleBadge(u.role)}`}>
-                  {u.firstName[0]}{u.lastName[0]}
-                </div>
-                <div>
-                  <h3 className="font-black text-slate-900 text-lg leading-tight">
-                    {u.lastName} {u.firstName}
-                  </h3>
-                  <span className={`inline-block mt-1 px-2.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest border ${getRoleBadge(u.role)}`}>
-                    {u.role}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 pt-4 border-t border-slate-50">
-              <div className="flex items-center gap-3 text-sm font-bold text-slate-600">
-                <Phone className="w-4 h-4 text-slate-400" />
-                {u.phoneNumber}
-              </div>
-              
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3 text-sm font-bold text-slate-600">
-                  <ShieldCheck className="w-4 h-4 text-[#009A44]" />
-                  <span className="font-mono text-xs text-slate-400">UUID vérifié</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  <Calendar className="w-3 h-3" />
-                  {new Date(u.createdAt).toLocaleDateString('fr-CI')}
-                </div>
-              </div>
-            </div>
-
+      {/* Section des comptes en attente */}
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-yellow-50 border-b border-yellow-100 p-5 flex items-center gap-3">
+          <div className="bg-yellow-500/20 p-2 rounded-lg">
+            <ShieldAlert className="w-6 h-6 text-yellow-700" />
           </div>
-        ))}
+          <div>
+            <h2 className="text-lg font-bold text-yellow-900">Comptes en attente de validation</h2>
+            <p className="text-sm text-yellow-700">Ces utilisateurs n'ont actuellement aucun accès au système.</p>
+          </div>
+        </div>
+
+        {pendingUsers.length === 0 ? (
+          <div className="p-10 text-center text-slate-500 flex flex-col items-center">
+            <CheckCircle className="w-12 h-12 text-slate-300 mb-3" />
+            <p className="font-medium text-lg">Aucun compte en attente</p>
+            <p className="text-sm">Votre système est à jour.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
+                  <th className="p-4 font-bold">Utilisateur</th>
+                  <th className="p-4 font-bold">Téléphone</th>
+                  <th className="p-4 font-bold">Statut Actuel</th>
+                  <th className="p-4 font-bold">Action (Assigner un rôle)</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {pendingUsers.map((user) => (
+                  <tr key={user.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="p-4">
+                      <p className="font-bold text-slate-900">{user.firstName} {user.lastName}</p>
+                    </td>
+                    <td className="p-4 font-mono text-sm text-slate-600">{user.phoneNumber}</td>
+                    <td className="p-4">
+                      <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full text-xs font-bold bg-yellow-100 text-yellow-800">
+                        <Clock className="w-3.5 h-3.5" />
+                        En attente
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      {/* Formulaire d'action direct */}
+                      <form action={validateUserAction} className="flex items-center gap-2">
+                        <input type="hidden" name="userId" value={user.id} />
+                        <select 
+                          name="role" 
+                          required
+                          className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-[#009A44] focus:border-[#009A44] block w-full p-2"
+                        >
+                          <option value="">-- Choisir un rôle --</option>
+                          <option value="COOPERATIVE">Coopérative</option>
+                          <option value="TRANSPORTER">Transporteur</option>
+                          <option value="BANK">Banque</option>
+                          <option value="ADMIN">Administrateur</option>
+                        </select>
+                        <button 
+                          type="submit" 
+                          className="bg-slate-900 hover:bg-slate-800 text-white p-2 rounded-lg transition-colors"
+                          title="Valider"
+                        >
+                          <CheckCircle className="w-5 h-5" />
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
     </div>

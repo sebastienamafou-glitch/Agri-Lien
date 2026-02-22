@@ -41,5 +41,6 @@ export const config = {
     "/cooperative/:path*",
     "/producer/:path*",
     "/transporter/:path*",
+    "/auth/pending",
   ],
 };

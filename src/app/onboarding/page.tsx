@@ -45,6 +45,8 @@ export default async function OnboardingSplashPage() {
       redirect("/transporter/dashboard");
     case "BANK":
       redirect("/bank/dashboard");
+    case "PENDING": 
+      redirect("/auth/pending"); 
     default:
       redirect("/auth/login?error=RoleNotDefined");
   }

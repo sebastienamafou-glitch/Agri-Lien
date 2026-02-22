@@ -20,6 +20,7 @@ enum UserRole {
   TRANSPORTER
   BANK
   ADMIN
+  PENDING
 }
 
 enum HarvestStatus {

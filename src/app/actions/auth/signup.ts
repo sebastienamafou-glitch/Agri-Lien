@@ -1,7 +1,7 @@
 "use server";
 
 import { UserRole } from "@prisma/client";
-import prisma from "@/lib/prisma"; // ✅ Utilisation du Singleton DRY
+import prisma from "@/lib/prisma"; 
 
 export async function signupAdmin(formData: FormData) {
   const firstName = formData.get("firstName") as string;
@@ -19,21 +19,19 @@ export async function signupAdmin(formData: FormData) {
   }
 
   try {
-    // 2. Création de l'utilisateur ADMIN
+    // 2. Création de l'utilisateur avec un rôle RESTREINT (Moindre privilège)
     await prisma.user.create({
       data: {
         firstName,
         lastName,
         phoneNumber,
-        role: UserRole.ADMIN,
-        // ✅ CORRECTION : On fournit le champ obligatoire manquant
-        // Dans une version future, ce sera le hash réel de leur carte d'identité
+        // ✅ CORRECTION : Le compte est mis "en attente" par défaut.
+        role: "PENDING" as UserRole, 
         nationalIdHash: "EN_ATTENTE_DE_VERIFICATION", 
       },
     });
 
-    // ✅ CORRECTION : On retourne un objet de succès au lieu d'utiliser redirect()
-    // Cela permet au composant client (page.tsx) de prendre le relais et de lancer l'auto-login !
+    // 3. Retour de succès pour déclencher l'auto-login vers la page /auth/pending
     return { success: true };
 
   } catch (error: any) {
