@@ -8,7 +8,6 @@ export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
       name: "Numéro de Téléphone",
-      // ✅ CORRECTION : On déclare tous les alias possibles pour que NextAuth ne les supprime pas
       credentials: {
         phoneNumber: { label: "Téléphone", type: "text" },
         phone: { label: "Téléphone", type: "text" },
@@ -18,7 +17,6 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials: any) {
         console.log("📥 [NEXTAUTH] Données reçues du formulaire :", credentials);
 
-        // 1. Récupération flexible (selon ce que le frontend a réellement envoyé)
         const phoneInputRaw = credentials?.phoneNumber || credentials?.phone;
         const codeInputRaw = credentials?.otp || credentials?.password;
 
@@ -27,7 +25,6 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Infos manquantes");
         }
 
-        // 2. Normalisation : On s'assure que le numéro commence par +225
         let phoneInput = phoneInputRaw.trim().replace(/\s/g, '');
         
         if (!phoneInput.startsWith('+')) {
@@ -36,7 +33,6 @@ export const authOptions: NextAuthOptions = {
         
         console.log(`🔍 [NEXTAUTH] Recherche en BDD pour : ${phoneInput}`);
 
-        // 3. Chercher l'utilisateur dans la DB
         const user = await prisma.user.findUnique({
           where: { phoneNumber: phoneInput },
         });
@@ -46,7 +42,6 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Utilisateur inconnu");
         }
 
-        // 4. Vérification OTP (123456 pour le dev)
         if (codeInputRaw === "123456") {
           console.log(`✅ [NEXTAUTH] Connexion réussie ! Rôle : ${user.role}`);
           return {
@@ -80,17 +75,7 @@ export const authOptions: NextAuthOptions = {
     }
   },
 
-  cookies: {
-    sessionToken: {
-      name: `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "lax",
-        path: "/",
-        secure: process.env.NODE_ENV === "production",
-      },
-    },
-  },
+  // 🗑️ Le bloc "cookies" personnalisé a été supprimé ici pour laisser NextAuth gérer le mode Secure automatiquement sur Vercel.
   
   pages: {
     signIn: "/auth/login",
