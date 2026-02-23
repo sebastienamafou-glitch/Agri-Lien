@@ -3,7 +3,19 @@ import { authOptions } from "@/infrastructure/auth/auth.config";
 import prisma from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Map, Sprout, TrendingUp, Navigation } from "lucide-react";
+import { ArrowLeft, Map, Sprout, TrendingUp, Navigation, Leaf, Wheat } from "lucide-react";
+
+// Helper pour les couleurs et labels selon la culture
+const getCropStyle = (type: string) => {
+  switch (type) {
+    case 'CACAO': return { color: 'text-[#009A44]', bg: 'bg-green-50', border: 'bg-[#009A44]', label: 'Cacao' };
+    case 'HEVEA': return { color: 'text-[#FF8200]', bg: 'bg-orange-50', border: 'bg-[#FF8200]', label: 'Hévéa' };
+    case 'ANACARDE': return { color: 'text-yellow-600', bg: 'bg-yellow-50', border: 'bg-yellow-500', label: 'Anacarde' };
+    case 'RIZ': return { color: 'text-sky-600', bg: 'bg-sky-50', border: 'bg-sky-500', label: 'Riz' };
+    case 'MANIOC': return { color: 'text-stone-600', bg: 'bg-stone-50', border: 'bg-stone-500', label: 'Manioc' };
+    default: return { color: 'text-slate-600', bg: 'bg-slate-50', border: 'bg-slate-500', label: type };
+  }
+};
 
 export default async function ProducerPlotsPage() {
   // 1. Récupération sécurisée
@@ -63,41 +75,45 @@ export default async function ProducerPlotsPage() {
         <div className="space-y-4">
           <h3 className="font-bold text-slate-900 px-1">Détails des exploitations</h3>
           
-          {plots.length > 0 ? plots.map((plot) => (
-            <div key={plot.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group">
-              {/* Petite barre latérale de couleur */}
-              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-[#FF8200]"></div>
-              
-              <div className="flex justify-between items-start mb-4 pl-2">
-                <div>
-                  <h4 className="font-bold text-lg text-slate-900">{plot.name}</h4>
-                  <p className="text-xs text-slate-500 font-mono">ID: {plot.id.substring(0, 8).toUpperCase()}</p>
+          {plots.length > 0 ? plots.map((plot) => {
+            const style = getCropStyle(plot.cropType);
+            
+            return (
+              <div key={plot.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden group hover:shadow-md transition">
+                {/* Petite barre latérale de couleur dynamique */}
+                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${style.border}`}></div>
+                
+                <div className="flex justify-between items-start mb-4 pl-2">
+                  <div>
+                    <h4 className="font-bold text-lg text-slate-900">{plot.name}</h4>
+                    <p className="text-xs text-slate-500 font-mono">ID: {plot.id.substring(0, 8).toUpperCase()}</p>
+                  </div>
+                  <div className={`${style.bg} ${style.color} p-2 rounded-lg flex items-center gap-1 font-black text-xs uppercase tracking-wide`}>
+                    <Sprout size={16} /> {style.label}
+                  </div>
                 </div>
-                <div className="bg-orange-50 p-2 rounded-lg text-[#FF8200]">
-                  <Sprout size={20} />
-                </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4 pl-2 border-t border-slate-50 pt-4">
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Superficie</p>
-                  <p className="text-xl font-black text-slate-800">{plot.areaHectares} <span className="text-sm text-slate-400">Ha</span></p>
+                <div className="grid grid-cols-2 gap-4 pl-2 border-t border-slate-50 pt-4">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">Superficie</p>
+                    <p className="text-xl font-black text-slate-800">{plot.areaHectares} <span className="text-sm text-slate-400">Ha</span></p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
+                      <TrendingUp size={10} /> Rendement Est.
+                    </p>
+                    <p className="text-xl font-black text-slate-800">{plot.estimatedYield ?? 0} <span className="text-sm text-slate-400">T</span></p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
-                    <TrendingUp size={10} /> Rendement Est.
-                  </p>
-                  <p className="text-xl font-black text-slate-800">{plot.estimatedYield ?? 0} <span className="text-sm text-slate-400">T</span></p>
-                </div>
+                
+                {/* Bouton Voir sur la carte */}
+                <button className="w-full mt-4 py-2 bg-slate-50 text-slate-600 font-bold text-sm rounded-xl hover:bg-slate-100 transition flex items-center justify-center gap-2">
+                  <Map size={16} />
+                  Voir le tracé GPS
+                </button>
               </div>
-              
-              {/* Bouton Voir sur la carte (Visuel pour l'instant) */}
-              <button className="w-full mt-4 py-2 bg-slate-50 text-slate-600 font-bold text-sm rounded-xl hover:bg-slate-100 transition flex items-center justify-center gap-2">
-                <Map size={16} />
-                Voir le tracé GPS
-              </button>
-            </div>
-          )) : (
+            );
+          }) : (
             <div className="text-center p-8 text-slate-400 bg-white rounded-2xl border border-dashed border-slate-200">
               <p>Aucune parcelle enregistrée.</p>
             </div>

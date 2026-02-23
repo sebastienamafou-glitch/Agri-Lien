@@ -4,22 +4,36 @@ import prisma from "@/lib/prisma";
 import { ArrowLeft, Sprout, Info } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import HarvestForm from "./HarvestForm"; // ✅ On importe le formulaire
+import HarvestForm from "./HarvestForm";
 
 export default async function NewHarvestPage() {
+  // 1. SÉCURITÉ : On vérifie la session
   const session = await getServerSession(authOptions);
-  if (!session?.user?.id) redirect("/auth/login");
+  if (!session?.user?.email) redirect("/auth/login");
 
-  const producerProfile = await prisma.producerProfile.findUnique({
-    where: { userId: session.user.id },
-    include: { farmPlots: true } 
+  // 2. RÉCUPÉRATION ROBUSTE : On passe par le numéro de téléphone (Badge)
+  const user = await prisma.user.findUnique({
+    where: { phoneNumber: session.user.email },
+    include: { 
+      producerProfile: {
+        include: { farmPlots: true }
+      }
+    } 
   });
+
+  const producerProfile = user?.producerProfile;
 
   if (!producerProfile) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50 text-center">
-        <Info className="w-12 h-12 text-slate-400 mb-4" />
-        <h2 className="text-xl font-black text-slate-900">Profil introuvable</h2>
+        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+          <Info className="w-8 h-8 text-slate-400" />
+        </div>
+        <h2 className="text-xl font-black text-slate-900">Profil Producteur introuvable</h2>
+        <p className="text-slate-500 mt-2 text-sm">Votre compte n'est pas encore lié à une exploitation.</p>
+        <Link href="/producer/dashboard" className="mt-6 inline-block text-blue-600 font-bold text-sm">
+          Retour au tableau de bord
+        </Link>
       </div>
     );
   }
@@ -42,7 +56,7 @@ export default async function NewHarvestPage() {
           <p className="text-slate-500 text-sm font-medium">Saisissez les informations de votre production avant l'ensachage.</p>
         </div>
 
-        {/* ✅ On appelle notre formulaire Client et on lui passe les données du Serveur */}
+        {/* Formulaire Client */}
         <HarvestForm plots={producerProfile.farmPlots} producerId={producerProfile.id} />
         
       </main>
