@@ -2,6 +2,7 @@ import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { UserRole } from "@prisma/client";
 import { ShieldAlert, CheckCircle, UserPlus, Clock } from "lucide-react";
+import Link from "next/link"; // ✅ Import correct pour la navigation
 
 // ✅ ACTION SERVEUR : Modifie le rôle dans la base de données
 async function validateUserAction(formData: FormData) {
@@ -35,11 +36,14 @@ export default async function AdminUsersPage() {
           <p className="text-slate-500 mt-1">Validez et attribuez les rôles aux nouveaux inscrits.</p>
         </div>
         
-        {/* Bouton pour créer manuellement (Future étape) */}
-        <button className="flex items-center gap-2 bg-[#009A44] hover:bg-green-700 text-white px-5 py-2.5 rounded-lg font-bold transition-colors shadow-sm">
+        {/* ✅ Bouton activé pour créer un utilisateur manuellement */}
+        <Link 
+          href="/admin/users/create" 
+          className="flex items-center gap-2 bg-[#009A44] hover:bg-green-700 text-white px-5 py-2.5 rounded-lg font-bold transition-colors shadow-sm"
+        >
           <UserPlus className="w-5 h-5" />
           <span>Créer un acteur certifié</span>
-        </button>
+        </Link>
       </div>
 
       {/* Section des comptes en attente */}

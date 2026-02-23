@@ -12,7 +12,7 @@ const formatNumber = (num: number) => {
   return new Intl.NumberFormat('fr-CI').format(num);
 };
 
-export default async function AdminDashboardPage() {
+export default async function cooperativeDashboardPage() {
   const stats = await getDashboardStats();
 
   return (
