@@ -6,6 +6,7 @@ import { Truck, MapPin, Navigation, Package, QrCode, UserIcon, ArrowRight } from
 import LogoutButton from "@/components/dashboard/LogoutButton";
 import { acceptOrder } from "@/app/actions/logistics/logistics";
 import { redirect } from "next/navigation";
+import { MeasurementUnit } from "@prisma/client"; // ✅ Import de l'enum pour éviter les erreurs
 
 export default async function TransporterDashboard() {
   const session = await getServerSession(authOptions);
@@ -19,29 +20,27 @@ export default async function TransporterDashboard() {
 
   if (!user) redirect("/auth/login");
 
-  // 🛠️ LA CORRECTION EST ICI : AUTO-CRÉATION DU PROFIL
-  // Si l'admin lui a donné le rôle mais qu'il n'a pas encore de profil transporteur
+  // 🛠️ CORRECTION : On utilise le bon nom de modèle 'transporterProfile'
   if (!user.transporterProfile) {
-    await prisma.transporter.create({
+    await prisma.transporterProfile.create({ // ✅ Correction ici (au lieu de prisma.transporter)
       data: {
         userId: user.id,
         vehicleType: "Camion Standard",
         capacity: 5,
-        unit: "TONNES",
+        unit: "TONNE", // ✅ Correction ici (Singulier pour matcher l'Enum du schéma)
       }
     });
-    // On recharge l'utilisateur pour avoir son nouvel ID de transporteur
+    
+    // On recharge l'utilisateur pour avoir son nouvel ID
     user = await prisma.user.findUnique({
       where: { phoneNumber: session.user.email },
       include: { transporterProfile: true }
     });
   }
 
-  // Maintenant, on est sûr à 100% d'avoir un ID valide
   const transporterId = user?.transporterProfile?.id;
 
-  // 2. Ses missions assignées (En cours ou à récupérer)
-  // Comme transporterId n'est plus jamais vide, il ne verra QUE les siennes !
+  // 2. Ses missions assignées
   const activeMissions = await prisma.transportOrder.findMany({
     where: {
       transporterId: transporterId,
@@ -51,7 +50,7 @@ export default async function TransporterDashboard() {
     orderBy: { requestedAt: "desc" }
   });
 
-  // 3. La Bourse de Fret (Les courses en attente que personne n'a encore prises)
+  // 3. La Bourse de Fret
   const availableMissions = await prisma.transportOrder.findMany({
     where: { status: "PENDING" },
     include: { producer: { include: { user: true } } },
@@ -183,7 +182,7 @@ export default async function TransporterDashboard() {
         </section>
       </main>
 
-      {/* NAVIGATION BAS (PWA) */}
+      {/* NAVIGATION BAS */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 px-6 py-4 flex justify-between items-center z-40 pb-safe shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)]">
         <Link href="/transporter/dashboard" className="flex flex-col items-center gap-1 text-blue-600">
           <Truck size={24} strokeWidth={2.5} />
@@ -202,4 +201,4 @@ export default async function TransporterDashboard() {
       </nav>
     </div>
   );
-}s
+}
