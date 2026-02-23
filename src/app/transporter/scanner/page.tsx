@@ -32,7 +32,8 @@ export default async function TransporterScannerPage() {
     include: {
       producer: { include: { user: true } }
     },
-    orderBy: { updatedAt: "desc" } // S'il en a plusieurs, on prend la plus récente
+    // ✅ CORRECTION : On utilise 'requestedAt' qui existe déjà dans votre schéma
+    orderBy: { requestedAt: "desc" } 
   });
 
   return (

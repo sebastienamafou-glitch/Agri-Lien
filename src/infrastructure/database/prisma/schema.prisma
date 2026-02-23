@@ -81,9 +81,9 @@ model User {
   lastName        String
   nationalIdHash  String   // AES-256 encrypted
   createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  updatedAt       DateTime @default(now()) @updatedAt
   deletedAt       DateTime?
-  
+
   producerProfile     ProducerProfile?
   transporterProfile  TransporterProfile?
   cooperativeProfile  CooperativeProfile?
@@ -261,6 +261,7 @@ model TransportOrder {
 
   status          TransportStatus
   requestedAt     DateTime @default(now())
+  updatedAt       DateTime @default(now()) @updatedAt // ✅ CORRECTION : Valeur par défaut pour éviter le crash
   completedAt     DateTime?
 
   @@index([producerId])
