@@ -1,21 +1,25 @@
 import prisma from "@/lib/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/infrastructure/auth/auth.config";
-import { Truck, MapPin, Clock, Navigation, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Truck, MapPin, Clock, Navigation, CheckCircle2, ArrowLeft, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import { requestTransport } from "@/app/actions/logistics/logistics";
+import { redirect } from "next/navigation";
 
 export default async function ProducerLogisticsPage() {
   const session = await getServerSession(authOptions);
   
+  if (!session?.user?.email) redirect("/auth/login");
+
   // Récupérer les demandes de transport de ce producteur
   const user = await prisma.user.findUnique({
-    where: { phoneNumber: session?.user?.email || "" },
+    where: { phoneNumber: session.user.email },
     include: {
       producerProfile: {
         include: {
           transportOrders: {
-            orderBy: { requestedAt: 'desc' },
+            // ✅ MAINTENANT CELA FONCTIONNE : On trie par la dernière mise à jour
+            orderBy: { updatedAt: 'desc' }, 
             include: { transporter: { include: { user: true } } }
           }
         }
@@ -24,7 +28,9 @@ export default async function ProducerLogisticsPage() {
   });
 
   const orders = user?.producerProfile?.transportOrders || [];
-  const activeOrder = orders.find(o => o.status === 'PENDING' || o.status === 'ACCEPTED' || o.status === 'IN_PROGRESS');
+  
+  // On cherche s'il y a une commande active (Pas encore finie ou annulée)
+  const activeOrder = orders.find(o => ['PENDING', 'ACCEPTED', 'IN_PROGRESS'].includes(o.status));
 
   return (
     <div className="min-h-screen bg-slate-50 pb-28 font-sans">
@@ -75,7 +81,11 @@ export default async function ProducerLogisticsPage() {
             </div>
             <div>
               <p className="font-bold text-orange-900">Demande en cours</p>
-              <p className="text-sm text-orange-700">Recherche d'un transporteur disponible...</p>
+              <p className="text-sm text-orange-700">
+                {activeOrder.status === 'PENDING' ? "Recherche d'un transporteur..." : 
+                 activeOrder.status === 'ACCEPTED' ? "Camion en approche !" : 
+                 "Transport vers le magasin."}
+              </p>
             </div>
           </div>
         )}
@@ -95,14 +105,17 @@ export default async function ProducerLogisticsPage() {
                 <div key={order.id} className="border border-slate-100 p-4 rounded-2xl flex flex-col gap-3 hover:border-slate-200 transition">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-2">
+                      <CalendarDays className="w-3.5 h-3.5 text-slate-400" />
                       <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                        {new Date(order.requestedAt).toLocaleDateString('fr-CI')}
+                        {/* On affiche la date de dernière mise à jour */}
+                        {new Date(order.updatedAt).toLocaleDateString('fr-CI', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                     
                     {/* BADGE DE STATUT */}
                     {order.status === 'PENDING' && <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded-md uppercase">En recherche</span>}
-                    {order.status === 'IN_PROGRESS' && <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-md uppercase">En route</span>}
+                    {order.status === 'ACCEPTED' && <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-md uppercase">Accepté</span>}
+                    {order.status === 'IN_PROGRESS' && <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-md uppercase animate-pulse">En route</span>}
                     {order.status === 'COMPLETED' && <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-1 rounded-md uppercase flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Livré</span>}
                   </div>
 
@@ -123,6 +136,16 @@ export default async function ProducerLogisticsPage() {
                       </div>
                     </div>
                   </div>
+                  
+                  {/* Affichage du transporteur si assigné */}
+                  {order.transporter && (
+                    <div className="mt-2 pt-3 border-t border-slate-50 flex items-center gap-2">
+                       <Truck className="w-3.5 h-3.5 text-slate-400" />
+                       <span className="text-xs font-medium text-slate-600">
+                         Chauffeur : <span className="text-slate-900 font-bold">{order.transporter.user.lastName}</span> ({order.transporter.vehicleType})
+                       </span>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
