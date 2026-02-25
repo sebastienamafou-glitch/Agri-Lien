@@ -33,7 +33,7 @@ export default function HarvestForm({ plots, producerId }: { plots: any[], produ
           farmPlotId: farmPlotId,
           quantity: quantity,
           cropType: cropType,
-          unit: "KG",
+          unit: "KG", // ✅ CORRECTION : Une seule valeur valide (Enum)
           scannedAt: new Date(),
           isSynced: 0
         });

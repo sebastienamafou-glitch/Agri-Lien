@@ -1,26 +1,24 @@
 "use client";
 
 import { useEffect } from "react";
+// ✅ IMPORT CORRECT (Avec les accolades)
 import { useSync } from "@/hooks/useSync";
 
 export default function OfflineManager() {
-  // 1. Active la surveillance réseau et la synchronisation automatique Dexie -> Prisma
+  // 1. Active la surveillance réseau
   useSync(); 
   
-  // 2. ✅ Enregistrement du Service Worker pour transformer le site en PWA
+  // 2. Enregistrement PWA
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("/sw.js")
         .then((registration) => {
-          console.log("✅ Service Worker enregistré avec succès (Portée:", registration.scope, ")");
+          console.log("✅ Service Worker enregistré:", registration.scope);
         })
-        .catch((error) => {
-          console.error("❌ Erreur lors de l'enregistrement du Service Worker:", error);
-        });
+        .catch((error) => console.error("❌ Erreur Service Worker:", error));
     }
   }, []);
 
-  // Il ne retourne rien visuellement (composant "fantôme")
   return null; 
 }

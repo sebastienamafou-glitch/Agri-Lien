@@ -1,12 +1,14 @@
 import Dexie, { Table } from 'dexie';
-// ✅ On importe l'action dédiée à la synchro (pas celle du formulaire web)
 import { syncHarvest } from '@/app/actions/sync'; 
 
+// ✅ Mise à jour de l'interface pour correspondre au nouveau schéma
 export interface OfflineHarvest {
   id?: number; 
   producerId: string;
   farmPlotId: string;
-  weightKg: number;
+  quantity: number; // Remplace weightKg
+  cropType: string; // Nouveau champ requis
+  unit: string;     // Nouveau champ requis
   scannedAt: Date;
   synced: boolean; 
 }
@@ -28,7 +30,8 @@ class AgriLienDatabase extends Dexie {
 
   constructor() {
     super('AgriLienOfflineDB');
-    this.version(1).stores({
+    // ✅ Passage en version 2 pour valider le changement de structure
+    this.version(2).stores({
       harvests: '++id, producerId, synced', 
       transportOrders: '++id, producerId, synced'
     });
@@ -43,10 +46,10 @@ export const db = new AgriLienDatabase();
 export async function saveHarvest(data: Omit<OfflineHarvest, 'id' | 'synced'>) {
   try {
     if (navigator.onLine) {
-      // ✅ Appel vers l'action JSON (sync.ts)
+      // ✅ Les données correspondent maintenant parfaitement à ce qu'attend syncHarvest
       const result = await syncHarvest(data);
       
-      if (!result.success) throw new Error(result.error);
+      if (!result.success) throw new Error(result.message || "Erreur inconnue");
 
       console.log("✅ [ONLINE] Récolte synchronisée immédiatement.");
       return { status: 'online', id: null };
@@ -54,6 +57,7 @@ export async function saveHarvest(data: Omit<OfflineHarvest, 'id' | 'synced'>) {
       throw new Error("Offline"); 
     }
   } catch (error) {
+    // Si échec ou hors ligne, on sauvegarde dans Dexie
     const id = await db.harvests.add({
       ...data,
       synced: false, 

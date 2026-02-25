@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks"; 
 import { db } from "@/lib/db"; 
 import { syncHarvest } from "@/app/actions/sync"; 
-import { processScan } from "@/app/actions/traceability/scan"; // ✅ On importe l'action des scans
+import { processScan } from "@/app/actions/traceability/scan"; 
 import { toast } from "sonner"; 
 
 export function useSync() {
@@ -14,9 +14,8 @@ export function useSync() {
   // 1. Surveillance des objets "Non Synchronisés"
   const pendingHarvests = useLiveQuery(
     () => db.harvests.where("isSynced").equals(0).toArray()
-  ) || []; // Valeur par défaut pour éviter les undefined
+  ) || [];
 
-  // ✅ Surveillance des scans en attente
   const pendingScans = useLiveQuery(
     () => db.scans.where("isSynced").equals(0).toArray()
   ) || [];
@@ -27,7 +26,7 @@ export function useSync() {
     
     const handleOnline = () => {
       setIsOnline(true);
-      triggerSync(); // Déclenche la synchro au retour du réseau
+      triggerSync(); 
     };
     const handleOffline = () => setIsOnline(false);
 
@@ -51,15 +50,17 @@ export function useSync() {
     let successCount = 0;
 
     toast.info("Connexion rétablie : Synchronisation en cours...", {
-      icon: "📶"
+      icon: "📶",
+      id: "sync-toast"
     });
 
-    // A. Synchronisation des Récoltes
     for (const harvest of harvestsToSync) {
       const result = await syncHarvest({
         producerId: harvest.producerId,
         farmPlotId: harvest.farmPlotId,
-        weightKg: harvest.weightKg,
+        quantity: harvest.quantity,
+        cropType: harvest.cropType,
+        unit: harvest.unit,
         scannedAt: harvest.scannedAt
       });
 
@@ -69,12 +70,8 @@ export function useSync() {
       }
     }
 
-    // B. ✅ Synchronisation des Scans de Sacs
     for (const scan of scansToSync) {
       const result = await processScan(scan.qrCode);
-
-      // Si c'est un succès, ou si le serveur nous dit que le code est déjà utilisé
-      // on supprime le scan local pour éviter qu'il ne bloque la file d'attente indéfiniment.
       if ((result.success || result.message?.includes("déjà")) && scan.id) {
         await db.scans.delete(scan.id);
         successCount++;
@@ -83,14 +80,9 @@ export function useSync() {
 
     setIsSyncing(false);
     if (successCount > 0) {
-      toast.success(`${successCount} éléments synchronisés avec succès !`);
+      toast.success(`${successCount} éléments synchronisés !`, { id: "sync-toast" });
     }
   };
 
-  return { 
-    isOnline, 
-    isSyncing, 
-    // Le compteur total inclut maintenant les récoltes et les scans
-    pendingCount: pendingHarvests.length + pendingScans.length 
-  };
+  return { isOnline, isSyncing };
 }

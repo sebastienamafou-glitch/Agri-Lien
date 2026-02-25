@@ -1,15 +1,18 @@
 import Dexie, { Table } from 'dexie';
 
+// ✅ Interface unique et conforme au schéma Prisma
 export interface OfflineHarvest {
   id?: number;
   producerId: string;
   farmPlotId: string;
-  weightKg: number;
+  quantity: number; // Remplace weightKg
+  cropType: string; // Nouveau champ requis
+  unit: string;     // Nouveau champ requis
   scannedAt: Date;
   isSynced: number; 
 }
 
-// ✅ Nouvelle interface pour les scans de sacs
+// ✅ Interface manquante ajoutée
 export interface OfflineScan {
   id?: number;
   qrCode: string;
@@ -19,14 +22,14 @@ export interface OfflineScan {
 
 export class AgriLienDB extends Dexie {
   harvests!: Table<OfflineHarvest>;
-  scans!: Table<OfflineScan>; // ✅ Ajout de la table
+  scans!: Table<OfflineScan>;
 
   constructor() {
     super('AgriLienOffline');
-    // Passage en version 2 pour forcer la mise à jour sur le téléphone
-    this.version(2).stores({
-      harvests: '++id, producerId, isSynced',
-      scans: '++id, qrCode, isSynced' // ✅ qrCode est indexé pour éviter les doublons locaux
+    // ✅ Passage en version 3 pour valider la nouvelle structure
+    this.version(3).stores({
+      harvests: '++id, producerId, isSynced, cropType',
+      scans: '++id, qrCode, isSynced'
     });
   }
 }
